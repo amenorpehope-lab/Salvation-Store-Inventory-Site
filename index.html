@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#12372a">
+  <title>Salvation Store Inventory</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root { color-scheme: light; --green:#12372a; --green2:#1c5a43; --cream:#f5f7f2; --ink:#17231d; --muted:#66736b; --line:#dce5dd; --red:#b42318; --amber:#9a6700; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--cream); color:var(--ink); font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+    header { background:var(--green); color:white; padding:22px 16px 18px; }
+    .wrap { width:min(1120px,100% - 28px); margin:0 auto; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .logo { width:42px;height:42px;border-radius:12px;background:#e6f2e8;color:var(--green);display:grid;place-items:center;font-weight:900;font-size:20px; }
+    h1 { margin:0;font-size:clamp(21px,4vw,29px);letter-spacing:-.5px; }
+    header p { margin:5px 0 0;color:#d4e6da;font-size:13px; }
+    .status { margin-top:14px; display:flex;align-items:center;gap:8px;font-size:12px;color:#d4e6da; }
+    .dot { width:8px;height:8px;border-radius:50%;background:#f6bd4b;display:inline-block; }
+    .dot.online { background:#71e3a1; }
+    main { padding:18px 0 40px; }
+    .notice { background:#fff7e6;border:1px solid #f1d59a;border-radius:12px;padding:11px 13px;font-size:12px;color:#704d00;margin-bottom:15px; }
+    .stats { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:18px; }
+    .stat,.panel { background:white;border:1px solid var(--line);border-radius:15px;box-shadow:0 2px 7px #102b1a08; }
+    .stat { padding:14px;min-height:94px; }
+    .stat span { color:var(--muted);font-size:12px;display:block; }
+    .stat strong { display:block;font-size:25px;margin-top:6px;letter-spacing:-.6px; }
+    .tabs { display:flex;gap:7px;overflow-x:auto;padding:0 0 12px; }
+    .tab { border:1px solid var(--line);background:white;color:var(--ink);padding:10px 14px;border-radius:999px;white-space:nowrap;font-weight:650;cursor:pointer; }
+    .tab.active { background:var(--green);border-color:var(--green);color:white; }
+    .panel { padding:16px;margin-bottom:14px; }
+    .panel h2 { margin:0 0 13px;font-size:17px; }
+    .section-head { display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap; }
+    .form-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px; }
+    label { display:block;font-size:12px;font-weight:700;color:#425047;margin-bottom:5px; }
+    input,select { width:100%;min-width:0;padding:11px 12px;border:1px solid #cfdad1;border-radius:9px;background:white;color:var(--ink);font:inherit; }
+    input:focus,select:focus { outline:2px solid #9bc6a8;border-color:var(--green2); }
+    .full { grid-column:1/-1; }
+    button { border:0;border-radius:9px;padding:11px 14px;background:var(--green2);color:white;font:inherit;font-weight:750;cursor:pointer; }
+    button:disabled { opacity:.55;cursor:wait; }
+    button.secondary { background:#edf3ee;color:var(--green);border:1px solid var(--line); }
+    button.danger { background:#fff0ef;color:var(--red);border:1px solid #f2c6c3; }
+    .actions { display:flex;gap:8px;flex-wrap:wrap;margin-top:12px; }
+    .muted { color:var(--muted);font-size:12px; }
+    .hidden { display:none!important; }
+    .search-row { display:flex;gap:9px;align-items:center;margin:8px 0 12px; }
+    .search-row input { flex:1; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%;border-collapse:collapse;min-width:580px; }
+    th,td { padding:11px 9px;border-bottom:1px solid #edf1ed;text-align:left;font-size:13px; }
+    th { color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em; }
+    td strong { font-size:13px; }
+    .pill { display:inline-block;padding:4px 8px;border-radius:999px;background:#eaf5ed;color:#1c6841;font-size:11px;font-weight:750; }
+    .pill.low { background:#fff0d3;color:#8b5700; }
+    .pill.out { background:#ffebe9;color:#b42318; }
+    .empty { padding:24px 10px;text-align:center;color:var(--muted); }
+    .toast { position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#17231d;color:white;padding:12px 16px;border-radius:11px;box-shadow:0 8px 28px #0003;z-index:10;max-width:calc(100% - 24px);font-size:13px; }
+    .history-list { display:grid;gap:9px; }
+    .history-item { border:1px solid var(--line);border-radius:10px;padding:11px;display:flex;justify-content:space-between;gap:12px; }
+    .history-item .meta { color:var(--muted);font-size:12px;margin-top:4px; }
+    .qty-sale { color:var(--red);font-weight:800; }
+    .qty-restock { color:#147545;font-weight:800; }
+    .report-cards { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px; }
+    .report { padding:13px;border-radius:11px;background:#f3f7f3;border:1px solid var(--line); }
+    .report span { display:block;color:var(--muted);font-size:12px; }
+    .report strong { display:block;font-size:22px;margin-top:5px; }
+    footer { text-align:center;color:var(--muted);font-size:11px;padding:10px 0 25px; }
+    @media(max-width:600px) { .wrap{width:calc(100% - 20px)} header{padding:18px 12px}.stats{gap:7px}.stat{padding:11px;min-height:83px}.stat strong{font-size:21px}.stat span{font-size:11px}.panel{padding:13px}.form-grid{grid-template-columns:1fr}.full{grid-column:auto}.report-cards{grid-template-columns:1fr 1fr}.report:last-child{grid-column:1/-1} }
+ /* Product pictures in the stock table */
+.product-thumb {
+  width: 60px;
+  height: 55px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #f5f7f2;
+  border: 1px solid #dce5dd;
+  display: block;
+}
+
+.no-product-image {
+  width: 60px;
+  height: 55px;
+  display: grid;
+  place-items: center;
+  background: #f5f7f2;
+  border: 1px dashed #cfdad1;
+  border-radius: 6px;
+  color: #66736b;
+  font-size: 10px;
+  text-align: center;} 
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand"><div class="logo">S</div><div><h1>Salvation Store Inventory</h1><p>Shared stock • Sales • Restocking • Reports</p></div></div>
+    <div class="status"><span id="statusDot" class="dot"></span><span id="connectionText">Connecting to shared inventory…</span></div>
+  </div>
+</header>
+<main class="wrap">
+  <div class="notice"><strong>Important:</strong> This version has no login, as requested. Anyone who gets the website link can view and change inventory. Share the link only with trusted staff.</div>
+  <section class="stats">
+    <div class="stat"><span>Products</span><strong id="statProducts">—</strong></div>
+    <div class="stat"><span>Total units in stock</span><strong id="statUnits">—</strong></div>
+    <div class="stat"><span>Low / out of stock</span><strong id="statLow">—</strong></div>
+  </section>
+  <nav class="tabs" aria-label="Inventory sections">
+    <button class="tab active" data-tab="stock">Stock</button>
+    <button class="tab" data-tab="sale">Record sale</button>
+    <button class="tab" data-tab="restock">Restock</button>
+    <button class="tab" data-tab="products">Add product</button>
+    <button class="tab" data-tab="history">History</button>
+    <button class="tab" data-tab="reports">Reports</button>
+  </nav>
+
+  <section id="view-stock" class="view">
+    <div class="panel">
+      <div class="section-head"><h2>Current stock</h2><span class="muted">Updates automatically on all connected phones</span></div>
+      <div class="search-row"><input id="searchStock" placeholder="Search products…" aria-label="Search products"></div>
+      <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Image</th>
+        <th>Product</th>
+        <th>Price (GH₵)</th>
+        <th>Unit</th>
+        <th>Quantity</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="stockRows"></tbody>
+  </table>
+</div>
+      <div id="stockEmpty" class="empty hidden">No products yet. Use “Add product” to create your first product.</div>
+    </div>
+  </section>
+
+  <section id="view-sale" class="view hidden">
+    <div class="panel">
+      <h2>Record a sale</h2>
+      <p class="muted">Enter the quantity sold. The shared stock will reduce for everyone immediately.</p>
+      <form id="saleForm" class="form-grid">
+        <div class="full"><label for="saleProduct">Product</label><select id="saleProduct" required></select></div>
+        <div><label for="saleQty">Quantity sold</label><input id="saleQty" type="number" min="1" step="1" required placeholder="e.g. 2"></div>
+        <div><label for="saleNote">Note (optional)</label><input id="saleNote" maxlength="120" placeholder="e.g. morning sale"></div>
+        <div class="full"><button type="submit">Confirm sale</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section id="view-restock" class="view hidden">
+    <div class="panel">
+      <h2>Restock products</h2>
+      <p class="muted">Enter the quantity added to the shared stock.</p>
+      <form id="restockForm" class="form-grid">
+        <div class="full"><label for="restockProduct">Product</label><select id="restockProduct" required></select></div>
+        <div><label for="restockQty">Quantity added</label><input id="restockQty" type="number" min="1" step="1" required placeholder="e.g. 12"></div>
+        <div><label for="restockNote">Note (optional)</label><input id="restockNote" maxlength="120" placeholder="e.g. supplier delivery"></div>
+        <div class="full"><button type="submit">Confirm restock</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section id="view-products" class="view hidden">
+    <div class="panel">
+      <h2 id="productFormTitle">Add a product</h2>
+      <form id="productForm" class="form-grid">
+        <input id="editProductId" type="hidden">
+        <div class="full"><label for="productName">Product name</label><input id="productName" maxlength="100" required placeholder="e.g. Electrical wire"></div>
+        <div><label for="productPrice">Price per unit (GH₵)</label><input id="productPrice" type="number" min="0" step="0.01" required placeholder="e.g. 25.00"></div>
+        <div><label for="productUnit">Unit of measure</label><input id="productUnit" maxlength="30" required placeholder="e.g. box, tin, bag, roll"></div>
+        <div><label for="productQty">Opening quantity</label><input id="productQty" type="number" min="0" step="1" value="0" required></div>
+        <div><label for="lowThreshold">Low-stock alert at</label><input id="lowThreshold" type="number" min="0" step="1" value="5" required></div>
+        <div class="full">
+  <label for="productImage">Product Picture</label>
+  <input
+    id="productImage"
+    type="file"
+    accept="image/jpeg,image/png,image/webp"
+  >
+  <img
+    id="imagePreview"
+    alt="Product picture preview"
+    hidden
+    style="width:150px;height:120px;object-fit:contain;margin-top:10px;"
+  >
+  <p class="muted">Optional. Choose a JPG, PNG or WebP image, up to 5 MB.</p>
+</div>
+        <div class="full actions"><button type="submit" id="saveProductButton">Save product</button><button class="secondary hidden" type="button" id="cancelEditButton">Cancel edit</button></div>
+      </form>
+      <p class="muted">Prices are displayed for staff. This website does not calculate sales revenue or profit.</p>
+    </div>
+  </section>
+
+  <section id="view-history" class="view hidden">
+    <div class="panel">
+      <div class="section-head"><h2>Transaction history</h2><select id="historyFilter" style="width:auto"><option value="all">All transactions</option><option value="sale">Sales only</option><option value="restock">Restocks only</option></select></div>
+      <div id="historyList" class="history-list"></div><div id="historyEmpty" class="empty hidden">No transactions have been recorded yet.</div>
+    </div>
+  </section>
+
+  <section id="view-reports" class="view hidden">
+    <div class="panel">
+      <h2>Quantity reports</h2>
+      <p class="muted">Reports count units sold, not money or profit.</p>
+      <div class="report-cards">
+        <div class="report"><span>Units sold today</span><strong id="soldToday">0</strong></div>
+        <div class="report"><span>Units sold this week</span><strong id="soldWeek">0</strong></div>
+        <div class="report"><span>Units sold this month</span><strong id="soldMonth">0</strong></div>
+      </div>
+    </div>
+  </section>
+  <footer>Salvation Store Inventory • Shared live stock</footer>
+</main>
+<div id="toast" class="toast hidden" role="status"></div>
+<script>
+/*
+  SETUP: Replace the two placeholder strings below with your Supabase Project URL
+  and anon/public key. Do not put a service_role key in this file.
+*/
+const SUPABASE_URL = "https://dchtjiphyxlhuewaavlv.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_TYzBeSGEQQODSMDSoCdfBg_tSOFP005";
+
+let db = null;
+let products = [];
+let transactions = [];
+let toastTimer = null;
+const $ = id => document.getElementById(id);
+const isConfigured = () => SUPABASE_URL.startsWith("https://") &&
+  !SUPABASE_URL.includes("PASTE_") && SUPABASE_ANON_KEY.length > 30 &&
+  !SUPABASE_ANON_KEY.includes("PASTE_");
+
+function toast(message, error=false) {
+  const el=$("toast"); el.textContent=message; el.style.background=error?"#9b211b":"#17231d"; el.classList.remove("hidden");
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.add("hidden"),3800);
+}
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function money(value) { return Number(value || 0).toLocaleString("en-GH",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+// Preview and upload product pictures
+
+let selectedProductImage = null;
+
+$("productImage").addEventListener("change", () => {
+  const file = $("productImage").files[0];
+  const preview = $("imagePreview");
+
+  selectedProductImage = file || null;
+
+  if (!file) {
+    preview.removeAttribute("src");
+    preview.hidden = true;
+    return;
+  }
+
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp"
+  ];
+
+  if (!allowedTypes.includes(file.type)) {
+    toast("Please choose a JPG, PNG or WebP image.", true);
+    $("productImage").value = "";
+    selectedProductImage = null;
+    preview.removeAttribute("src");
+    preview.hidden = true;
+    return;
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    toast("The picture must be smaller than 5 MB.", true);
+    $("productImage").value = "";
+    selectedProductImage = null;
+    preview.removeAttribute("src");
+    preview.hidden = true;
+    return;
+  }
+
+  preview.src = URL.createObjectURL(file);
+  preview.hidden = false;
+});
+
+async function uploadProductImage(file) {
+  if (!file) return null;
+
+  const allowedTypes = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp"
+  };
+
+  if (!allowedTypes[file.type]) {
+    throw new Error("Unsupported image format.");
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("Image must be smaller than 5 MB.");
+  }
+
+  const extension = allowedTypes[file.type];
+  const filePath = `${crypto.randomUUID()}.${extension}`;
+
+  const { error: uploadError } = await db.storage
+    .from("product-images")
+    .upload(filePath, file, {
+      contentType: file.type,
+      upsert: false
+    });
+
+  if (uploadError) throw uploadError;
+
+  const { data } = db.storage
+    .from("product-images")
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
+}
+function dateText(value) { return new Date(value).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}); }
+function setConnection(ok, message) {
+  $("statusDot").classList.toggle("online",ok); $("connectionText").textContent=message;
+}
+function switchTab(tab) {
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
+  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("hidden",v.id!=="view-"+tab));
+}
+document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
+
+function render() {
+  $("statProducts").textContent=products.length;
+  $("statUnits").textContent=products.reduce((sum,p)=>sum+Number(p.quantity),0).toLocaleString();
+  $("statLow").textContent=products.filter(p=>Number(p.quantity)<=Number(p.low_stock_threshold)).length;
+  const query=$("searchStock").value.trim().toLowerCase();
+  const filtered=products.filter(p=>p.name.toLowerCase().includes(query));
+  $("stockRows").innerHTML=filtered.map(p=>{
+    const q=Number(p.quantity), threshold=Number(p.low_stock_threshold);
+    const status=q===0?'<span class="pill out">Out of stock</span>':q<=threshold?'<span class="pill low">Low stock</span>':'<span class="pill">In stock</span>';
+    const imageCell = p.image_url
+  ? `<img
+       class="product-thumb"
+       src="${escapeHtml(p.image_url)}"
+       alt="${escapeHtml(p.name)}"
+       loading="lazy"
+     >`
+  : `<div class="no-product-image">No image</div>`;
+
+return `<tr>
+  <td>${imageCell}</td>
+  <td><strong>${escapeHtml(p.name)}</strong></td>
+  <td>${money(p.price)}</td>
+  <td>${escapeHtml(p.unit)}</td>
+  <td><strong>${q.toLocaleString()}</strong></td>
+  <td>${status}</td>
+  <td><button class="secondary edit-product" data-id="${p.id}">Edit</button></td>
+</tr>`;
+  }).join("");
+  $("stockEmpty").classList.toggle("hidden",filtered.length!==0);
+  ["saleProduct","restockProduct"].forEach(id=>{
+    const old=$(id).value;
+    $(id).innerHTML='<option value="">Choose a product…</option>'+products.map(p=>`<option value="${p.id}">${escapeHtml(p.name)} — ${escapeHtml(p.quantity)} ${escapeHtml(p.unit)} (GH₵${money(p.price)})</option>`).join("");
+    if(products.some(p=>p.id===old)) $(id).value=old;
+  });
+  renderHistory(); renderReports();
+}
+function renderHistory() {
+  const filter=$("historyFilter").value;
+  const list=transactions.filter(t=>filter==="all"||t.type===filter);
+  $("historyList").innerHTML=list.slice(0,250).map(t=>{
+    const productName=t.products?.name || products.find(p=>p.id===t.product_id)?.name || "Product";
+    const isSale=t.type==="sale";
+    return `<div class="history-item"><div><strong>${escapeHtml(productName)}</strong><div class="meta">${dateText(t.created_at)}${t.note?" • "+escapeHtml(t.note):""}</div></div><div style="text-align:right"><div class="${isSale?"qty-sale":"qty-restock"}">${isSale?"−":"+"}${Number(t.quantity).toLocaleString()}</div><div class="meta">${isSale?"Sale":"Restock"}</div></div></div>`;
+  }).join("");
+  $("historyEmpty").classList.toggle("hidden",list.length!==0);
+}
+function renderReports() {
+  const now=new Date();
+  const todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const day=(now.getDay()+6)%7;
+  const weekStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()-day);
+  const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
+  const sumSince=start=>transactions.filter(t=>t.type==="sale"&&new Date(t.created_at)>=start).reduce((s,t)=>s+Number(t.quantity),0);
+  $("soldToday").textContent=sumSince(todayStart).toLocaleString();
+  $("soldWeek").textContent=sumSince(weekStart).toLocaleString();
+  $("soldMonth").textContent=sumSince(monthStart).toLocaleString();
+}
+async function loadData() {
+  const [p,t]=await Promise.all([
+    db.from("products").select("*").order("name"),
+    db.from("transactions").select("id,product_id,type,quantity,note,created_at,products(name)").order("created_at",{ascending:false}).limit(1000)
+  ]);
+  if(p.error) throw p.error; if(t.error) throw t.error;
+  products=p.data||[]; transactions=t.data||[]; render();
+}
+function resetProductForm() {
+  $("productImage").value = "";
+  $("imagePreview").hidden = true;
+  $("productForm").reset(); $("editProductId").value=""; $("productQty").value="0"; $("lowThreshold").value="5";
+  $("productFormTitle").textContent="Add a product"; $("saveProductButton").textContent="Save product"; $("cancelEditButton").classList.add("hidden");
+}
+$("searchStock").addEventListener("input",render);
+$("historyFilter").addEventListener("change",renderHistory);
+$("cancelEditButton").addEventListener("click",resetProductForm);
+$("stockRows").addEventListener("click",e=>{
+  const b=e.target.closest(".edit-product"); if(!b)return;
+  const p=products.find(x=>x.id===b.dataset.id); if(!p)return;
+  $("editProductId").value=p.id; $("productName").value=p.name; $("productPrice").value=p.price;
+  $("productUnit").value=p.unit; $("productQty").value=p.quantity; $("lowThreshold").value=p.low_stock_threshold;
+  $("productFormTitle").textContent="Edit product"; $("saveProductButton").textContent="Save changes";
+  $("cancelEditButton").classList.remove("hidden"); switchTab("products"); window.scrollTo({top:0,behavior:"smooth"});
+});
+$("productForm").addEventListener("submit",async e=>{
+  e.preventDefault(); if(!db)return;
+  const id=$("editProductId").value;
+  const payload={name:$("productName").value.trim(),price:Number($("productPrice").value),unit:$("productUnit").value.trim(),low_stock_threshold:Number($("lowThreshold").value)};
+  // Upload the selected picture, if one was chosen
+const imageFile = selectedProductImage;
+
+if (imageFile) {
+  try {
+    payload.image_url = await uploadProductImage(imageFile);
+  } catch (imageError) {
+    return toast(
+      "Picture upload failed: " + imageError.message,
+      true
+    );
+  }
+}
+  if(!payload.name||!payload.unit||payload.price<0||payload.low_stock_threshold<0)return toast("Check the product details.",true);
+  const button=$("saveProductButton");button.disabled=true;
+  try {
+    let result;
+    if(id) {
+      const old=products.find(p=>p.id===id);
+      result=await db.from("products").update(payload).eq("id",id);
+      if(result.error)throw result.error;
+      const newQty=Number($("productQty").value);
+      if(newQty!==Number(old.quantity)) {
+        toast("Product details saved. Use Restock or Record sale to change stock quantity.");
+      } else toast("Product updated.");
+    } else {
+      payload.quantity=Number($("productQty").value);
+      if(!Number.isInteger(payload.quantity)||payload.quantity<0)return toast("Opening quantity must be a whole number of 0 or more.",true);
+      result=await db.from("products").insert(payload);
+      if(result.error)throw result.error;
+      toast("Product added.");
+    }
+    resetProductForm(); await loadData();
+  } catch(err) { toast(err.message||"Could not save product.",true); }
+  finally { button.disabled=false; }
+});
+async function doTransaction(type,productId,qty,note) {
+  if(!Number.isInteger(qty)||qty<1)throw new Error("Quantity must be a whole number greater than zero.");
+  const {data,error}=await db.rpc(type==="sale"?"record_sale":"record_restock",{p_product_id:productId,p_quantity:qty,p_note:note||null});
+  if(error)throw error;
+  await loadData();
+  return data;
+}
+$("saleForm").addEventListener("submit",async e=>{
+  e.preventDefault();const b=e.submitter;b.disabled=true;
+  try {await doTransaction("sale",$("saleProduct").value,Number($("saleQty").value),$("saleNote").value.trim());$("saleForm").reset();toast("Sale recorded. Shared stock updated.");}
+  catch(err){toast(err.message||"Sale could not be recorded.",true);}
+  finally{b.disabled=false;}
+});
+$("restockForm").addEventListener("submit",async e=>{
+  e.preventDefault();const b=e.submitter;b.disabled=true;
+  try {await doTransaction("restock",$("restockProduct").value,Number($("restockQty").value),$("restockNote").value.trim());$("restockForm").reset();toast("Restock recorded. Shared stock updated.");}
+  catch(err){toast(err.message||"Restock could not be recorded.",true);}
+  finally{b.disabled=false;}
+});
+async function start() {
+  if(!isConfigured()) {
+    setConnection(false,"Setup needed — add your Supabase URL and anon key in this file.");
+    toast("Follow README.txt to connect the shared database.",true); return;
+  }
+  db=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+  try {
+    await loadData();setConnection(true,"Connected • shared stock is live");
+    db.channel("salvation-store-live")
+      .on("postgres_changes",{event:"*",schema:"public",table:"products"},async()=>{try{await loadData()}catch(e){setConnection(false,"Sync error — check internet/database");}})
+      .on("postgres_changes",{event:"*",schema:"public",table:"transactions"},async()=>{try{await loadData()}catch(e){setConnection(false,"Sync error — check internet/database");}})
+      .subscribe(status=>{if(status==="SUBSCRIBED")setConnection(true,"Connected • shared stock is live");});
+  } catch(err) {setConnection(false,"Could not connect — check setup and internet");toast(err.message||"Database connection failed.",true);}
+}
+start();
+</script>
+</body>
+</html>
